@@ -148,7 +148,7 @@ function _make_targetinfo(mode, arch, target)
         -- fix c++17 to cxx17 for Xmake.props
         targetinfo.languages = targetinfo.languages:replace("c++", "cxx", {plain = true})
     end
-    if target:is_phony() or target:is_headeronly() then
+    if target:is_phony() or target:is_headeronly() or target:is_object() then
         return targetinfo
     end
 
