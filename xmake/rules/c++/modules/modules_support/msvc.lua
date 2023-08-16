@@ -71,7 +71,7 @@ function _compile(target, flags, sourcefile)
 end
 
 -- do compile for batchcmds
--- @note we need use batchcmds:compilev to translate paths in compflags for generator, e.g. -Ixx
+-- @note we need to use batchcmds:compilev to translate paths in compflags for generator, e.g. -Ixx
 function _batchcmds_compile(batchcmds, target, flags, sourcefile)
     local compinst = target:compiler("cxx")
     local compflags = compinst:compflags({sourcefile = sourcefile, target = target})
@@ -133,9 +133,13 @@ end
 -- load module support for the current target
 function load(target)
 
-    -- add modules flags
+    -- add modules flags if visual studio version is < 16.11 (vc 14.29)
     local modulesflag = get_modulesflag(target)
-    target:add("cxxflags", modulesflag)
+    local msvc = target:toolchain("msvc")
+    local vcvars = msvc:config("vcvars")
+    if vcvars.VCInstallDir and vcvars.VCToolsVersion and semver.compare(vcvars.VCToolsVersion, "14.29") < 0 then
+        target:add("cxxflags", modulesflag)
+    end
 
     -- enable std modules if c++23 by defaults
     if target:data("c++.msvc.enable_std_import") == nil then
@@ -155,7 +159,7 @@ function load(target)
         local msvc = target:toolchain("msvc")
         if msvc then
             local vcvars = msvc:config("vcvars")
-            if vcvars.VCInstallDir and vcvars.VCToolsVersion and semver.compare(vcvars.VCToolsVersion, "14.35") then
+            if vcvars.VCInstallDir and vcvars.VCToolsVersion and semver.compare(vcvars.VCToolsVersion, "14.35") > 0 then
                 stdmodulesdir = path.join(vcvars.VCInstallDir, "Tools", "MSVC", vcvars.VCToolsVersion, "modules")
             end
         end
@@ -226,6 +230,7 @@ function generate_headerunit_for_batchjob(target, name, flags, objectfile, index
         progress.show((index * 100) / total, "${color.build.object}compiling.headerunit.$(mode) %s", name)
         _compile(target, table.join(common_flags, flags))
         _add_objectfile_to_link_arguments(target, objectfile)
+        common.memcache():set2(name, "generating", false)
     end
 end
 
@@ -605,7 +610,11 @@ function get_modulesflag(target)
         if compinst:has_flags("-experimental:module", "cxxflags", {flagskey = "cl_experimental_module"}) then
             modulesflag = "-experimental:module"
         end
-        assert(modulesflag, "compiler(msvc): does not support c++ module!")
+        local msvc = target:toolchain("msvc")
+        local vcvars = msvc:config("vcvars")
+        if vcvars.VCInstallDir and vcvars.VCToolsVersion and semver.compare(vcvars.VCToolsVersion, "14.29") < 0 then
+            assert(modulesflag, "compiler(msvc): does not support c++ module!")
+        end
         _g.modulesflag = modulesflag or false
     end
     return modulesflag or nil
@@ -740,7 +749,20 @@ function get_requiresflags(target, requires, opt)
             local modulemap_ = _get_modulemap_from_mapper(dep)
             if modulemap_[name] then
                 table.join2(flags, modulemap_[name].flag)
-                table.join2(flags, modulemap_[name].deps or {})
+                -- we need to ignore headerunits from deps
+                -- @see https://github.com/xmake-io/xmake/issues/3925
+                local skip = 0
+                for _, flag in ipairs(modulemap_[name].deps) do
+                    if flag:find("headerUnit:quote", 1, true) then
+                        skip = 2
+                    end
+                    if skip == 0 then
+                        table.insert(flags, flag)
+                    end
+                    if skip > 0 then
+                        skip = skip - 1
+                    end
+                end
                 already_mapped_modules[name] = true
                 goto continue
             end

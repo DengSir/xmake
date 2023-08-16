@@ -2,7 +2,7 @@
 %define     use_luajit 0
 
 Name:       xmake
-Version:    2.7.9
+Version:    2.8.1
 Release:    1%{?dist}
 Summary:    A cross-platform build utility based on Lua
 
@@ -53,11 +53,7 @@ rm -rf core/src/{lua,luajit,lua-cjson,lz4,pdcurses}/*/
 
 %build
 %set_build_flags
-./configure --external=yes \
-  --prefix=%{_prefix} \
-  --bindir=%{_bindir} \
-  --libdir=%{_libdir} \
-  --includedir=%{_includedir} \
+%configure --external=yes
 %if %{use_luajit}
   --runtime=luajit
 %else
@@ -100,6 +96,9 @@ cp -rp xmake \
 %{_mandir}/man1/*.1*
 
 %changelog
+* Tue Jul 11 2023 Zephyr Lykos <fedora@mochaa.ws> - 2.8.1-1
+- Update to 2.8.1
+
 * Sun Jun 04 2023 Zephyr Lykos <fedora@mochaa.ws> - 2.7.9-1
 - Switch to release tarball
 - Use system provided libs if possible

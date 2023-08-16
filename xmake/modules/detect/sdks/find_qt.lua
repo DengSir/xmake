@@ -158,10 +158,10 @@ function _find_qmake(sdkdir, sdkver)
         end
     end
 
-    -- we need find the default qmake in current system
+    -- we need to find the default qmake in current system
     -- maybe we only installed qmake6
     if not qmake then
-        local suffixes = {"", "6"}
+        local suffixes = {"", "6", "-qt5"}
         for _, suffix in ipairs(suffixes) do
             qmake = find_tool("qmake", {program = "qmake" .. suffix, paths = sdkdir and path.join(sdkdir, "bin")})
             if qmake then

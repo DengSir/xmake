@@ -214,8 +214,6 @@ end
 
 -- make header
 function _make_header(vcxprojfile, vsinfo)
-
-    -- make header
     vcxprojfile:print("<?xml version=\"1.0\" encoding=\"utf-8\"?>")
     vcxprojfile:enter("<Project DefaultTargets=\"Build\" ToolsVersion=\"%s.0\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">", assert(vsinfo.project_version))
 end
@@ -551,7 +549,7 @@ function _make_source_options_cuda(vcxprojfile, flags, opt)
 
         -- make Warning
         if flagstr:find("[%-/]W[1234]") then
-            local wlevel = flagstr:find("[%-/](W[1234])")
+            local wlevel = flagstr:match("[%-/](W[1234])")
             vcxprojfile:print("<Warning%s>%s</Warning>", condition, wlevel)
         elseif flagstr:find("[%-/]Wall") then
             vcxprojfile:print("<Warning%s>Wall</Warning>", condition)
@@ -1116,7 +1114,7 @@ function _make_source_file_forall(vcxprojfile, vsinfo, target, sourcefile, sourc
         -- for *.c/cpp/cu files
         else
 
-            -- we need use different object directory and allow parallel building
+            -- we need to use different object directory and allow parallel building
             --
             -- @see https://github.com/xmake-io/xmake/issues/2016
             -- https://github.com/xmake-io/xmake/issues/1062
@@ -1248,7 +1246,7 @@ function _make_source_file_forspec(vcxprojfile, vsinfo, target, sourcefile, sour
 
         -- for *.c/cpp/cu files
         else
-           -- we need use different object directory and allow parallel building
+           -- we need to use different object directory and allow parallel building
             --
             -- @see https://github.com/xmake-io/xmake/issues/2016
             -- https://github.com/xmake-io/xmake/issues/1062
@@ -1349,7 +1347,7 @@ function _make_source_files(vcxprojfile, vsinfo, target)
     local pcheader = target.pcxxheader or target.pcheader
     vcxprojfile:enter("<ItemGroup>")
         for _, includefile in ipairs(target.headerfiles) do
-            -- we need ignore pcheader file to fix https://github.com/xmake-io/xmake/issues/1171
+            -- we need to ignore pcheader file to fix https://github.com/xmake-io/xmake/issues/1171
             if not pcheader or includefile ~= pcheader then
                 _make_header_file(vcxprojfile, includefile, target.project_dir)
             end

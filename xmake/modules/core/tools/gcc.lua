@@ -112,7 +112,7 @@ function nf_symbol(self, level)
         end
         return maps[level .. '_' .. kind] or maps[level]
     elseif kind == "ld" or kind == "sh" then
-        -- we need add `-g` to linker to generate pdb symbol file for mingw-gcc, llvm-clang on windows
+        -- we need to add `-g` to linker to generate pdb symbol file for mingw-gcc, llvm-clang on windows
         local plat = self:plat()
         if level == "debug" and (plat == "windows" or (plat == "mingw" and is_host("windows"))) then
             return "-g"
@@ -164,17 +164,21 @@ function nf_optimize(self, level)
 end
 
 -- make the vector extension flag
+-- @see https://github.com/xmake-io/xmake/issues/1613
 function nf_vectorext(self, extension)
     local maps = {
-        mmx   = "-mmmx"
-    ,   sse   = "-msse"
-    ,   sse2  = "-msse2"
-    ,   sse3  = "-msse3"
-    ,   ssse3 = "-mssse3"
-    ,   avx   = "-mavx"
-    ,   avx2  = "-mavx2"
-    ,   fma   = "-mfma"
-    ,   neon  = "-mfpu=neon"
+        mmx        = "-mmmx"
+    ,   sse        = "-msse"
+    ,   sse2       = "-msse2"
+    ,   sse3       = "-msse3"
+    ,   ssse3      = "-mssse3"
+    ,   ["sse4.2"] = "-msse4.2"
+    ,   avx        = "-mavx"
+    ,   avx2       = "-mavx2"
+    ,   avx512     = {"-mavx512f", "-mavx512dq", "-mavx512bw", "-mavx512vl"}
+    ,   fma        = "-mfma"
+    ,   neon       = "-mfpu=neon"
+    ,   all        = "-march=native"
     }
     return maps[extension]
 end
@@ -276,7 +280,11 @@ end
 
 -- make the link flag
 function nf_link(self, lib)
-    return "-l" .. lib
+    if lib:endswith(".a") or lib:endswith(".so") or lib:endswith(".dylib") or lib:endswith(".lib") then
+        return lib
+    else
+        return "-l" .. lib
+    end
 end
 
 -- make the syslink flag
@@ -329,9 +337,44 @@ function nf_exception(self, exp)
     return exp:startswith("no-") and "-fno-exceptions" or "-fexceptions"
 end
 
+-- make the encoding flag
+-- @see https://github.com/xmake-io/xmake/issues/2471
+--
+-- e.g.
+-- set_encodings("utf-8")
+-- set_encodings("source:utf-8", "target:utf-8")
+function nf_encoding(self, encoding)
+    local kind
+    local charset
+    local splitinfo = encoding:split(":")
+    if #splitinfo > 1 then
+        kind = splitinfo[1]
+        charset = splitinfo[2]
+    else
+        charset = encoding
+    end
+    local charsets = {
+        ["utf-8"] = "UTF-8",
+        utf8 = "UTF-8"
+    }
+    local flags = {}
+    charset = charsets[charset:lower()]
+    if charset then
+        if kind == "source" or not kind then
+            table.insert(flags, "-finput-charset=" .. charset)
+        end
+        if kind == "target" or not kind then
+            table.insert(flags, "-fexec-charset=" .. charset)
+        end
+    end
+    if #flags > 0 then
+        return flags
+    end
+end
+
 -- make the c precompiled header flag
 function nf_pcheader(self, pcheaderfile, target)
-    if self:kind() == "cc" or self:kind() == "mm" then
+    if self:kind() == "cc" then
         local pcoutputfile = target:pcoutputfile("c")
         if self:name() == "clang" then
             return {"-include", pcheaderfile, "-include-pch", pcoutputfile}
@@ -343,8 +386,32 @@ end
 
 -- make the c++ precompiled header flag
 function nf_pcxxheader(self, pcheaderfile, target)
-    if self:kind() == "cxx" or self:kind() == "mxx" then
+    if self:kind() == "cxx" then
         local pcoutputfile = target:pcoutputfile("cxx")
+        if self:name() == "clang" then
+            return {"-include", pcheaderfile, "-include-pch", pcoutputfile}
+        else
+            return {"-include", path.filename(pcheaderfile), "-I", path.directory(pcoutputfile)}
+        end
+    end
+end
+
+-- make the objc precompiled header flag
+function nf_pmheader(self, pcheaderfile, target)
+    if self:kind() == "mm" then
+        local pcoutputfile = target:pcoutputfile("m")
+        if self:name() == "clang" then
+            return {"-include", pcheaderfile, "-include-pch", pcoutputfile}
+        else
+            return {"-include", path.filename(pcheaderfile), "-I", path.directory(pcoutputfile)}
+        end
+    end
+end
+
+-- make the objc++ precompiled header flag
+function nf_pmxxheader(self, pcheaderfile, target)
+    if self:kind() == "mxx" then
+        local pcoutputfile = target:pcoutputfile("mxx")
         if self:name() == "clang" then
             return {"-include", pcheaderfile, "-include-pch", pcoutputfile}
         else
@@ -398,7 +465,7 @@ end
 
 -- link the target file
 --
--- maybe we need use os.vrunv() to show link output when enable verbose information
+-- maybe we need to use os.vrunv() to show link output when enable verbose information
 -- @see https://github.com/xmake-io/xmake/discussions/2916
 --
 function link(self, objectfiles, targetkind, targetfile, flags)
@@ -455,7 +522,7 @@ function _preprocess(program, argv, opt)
         end
     end
 
-    -- enable "-fdirectives-only"? we need enable it manually
+    -- enable "-fdirectives-only"? we need to enable it manually
     --
     -- @see https://github.com/xmake-io/xmake/issues/2603
     -- https://github.com/xmake-io/xmake/issues/2425
@@ -549,7 +616,7 @@ function _preprocess(program, argv, opt)
     table.insert(cppflags, cppfile)
     table.insert(cppflags, sourcefile)
 
-    -- we need mark as it when compiling the preprocessed source file
+    -- we need to mark as it when compiling the preprocessed source file
     -- it will indicate to the preprocessor that the input file has already been preprocessed.
     if is_gcc then
         table.insert(flags, "-fpreprocessed")
@@ -577,7 +644,7 @@ end
 -- compile preprocessed file
 function _compile_preprocessed_file(program, cppinfo, opt)
     local outdata, errdata = os.iorunv(program, table.join(cppinfo.cppflags, "-o", cppinfo.objectfile, cppinfo.cppfile), opt)
-    -- we need get warning information from output
+    -- we need to get warning information from output
     cppinfo.outdata = outdata
     cppinfo.errdata = errdata
 end
@@ -623,10 +690,19 @@ function _compargv_pch(self, pcheaderfile, pcoutputfile, flags)
         end
     end
 
-    -- compile header.h as c++?
+    -- set the language of precompiled header?
     if self:kind() == "cxx" then
         table.insert(pchflags, "-x")
         table.insert(pchflags, "c++-header")
+    elseif self:kind() == "cc" then
+        table.insert(pchflags, "-x")
+        table.insert(pchflags, "c-header")
+    elseif self:kind() == "mxx" then
+        table.insert(pchflags, "-x")
+        table.insert(pchflags, "objective-c++-header")
+    elseif self:kind() == "mm" then
+        table.insert(pchflags, "-x")
+        table.insert(pchflags, "objective-c-header")
     end
 
     -- make the compile arguments list
@@ -635,7 +711,7 @@ end
 
 -- get modules cache directory
 function _modules_cachedir(target)
-    if target and target.autogendir and target:data("cxx.has_modules") then -- we need ignore option instance
+    if target and target.autogendir and target:data("cxx.has_modules") then -- we need to ignore option instance
         return path.join(target:autogendir(), "rules", "modules", "cache")
     end
 end

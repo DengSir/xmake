@@ -4,8 +4,35 @@
 
 ### New features
 
+* [#4002](https://github.com/xmake-io/xmake/issues/4002): Add soname and version support
+* [#1613](https://github.com/xmake-io/xmake/issues/1613): Add avx512 and sse4.2 for add_vectorexts
+* [#2471](https://github.com/xmake-io/xmake/issues/2471): Add set_encodings to set source/target encodings
+* [#4071](https://github.com/xmake-io/xmake/pull/4071): Support the stm8 assembler on the sdcc toolchain.
+
+### Changes
+
+* [#3960](https://github.com/xmake-io/xmake/issues/3960): Improve msys2/crt64 support
+* [#4032](https://github.com/xmake-io/xmake/pull/4032): Remove some old deprecated apis
+* Improve to upgrade vcproj files in tools.msbuild
+* Support add_requires("xmake::xxx") package
+* [#4049](https://github.com/xmake-io/xmake/issues/4049): Improve rust to support cross-compilation
+* Improve clang modules support
+
+### Bugs fixed
+
+* Fix exit all child processes on macOS/Linux
+
+## v2.8.1
+
+### New features
+
 * [#3821](https://github.com/xmake-io/xmake/pull/3821): Add longpath option for windows installer
 * [#3828](https://github.com/xmake-io/xmake/pull/3828): Add support for zypper package manager
+* [#3871](https://github.com/xmake-io/xmake/issues/3871): Improve tools.msbuild to support for upgrading vsproj
+* [#3148](https://github.com/xmake-io/xmake/issues/3148): Support grpc for protobuf
+* [#3889](https://github.com/xmake-io/xmake/issues/3889): Support to add library path for add_links
+* [#3912](https://github.com/orgs/xmake-io/issues/3912): Add set_pmxxheader to support objc precompiled header
+* add_links support library file path
 
 ### Changes
 
@@ -13,11 +40,16 @@
 * [#3371](https://github.com/xmake-io/xmake/issues/3371): Improve tools.cmake to support ninja generator for wasm
 * [#3777](https://github.com/xmake-io/xmake/issues/3777): Improve to find package from pkg-config
 * [#3815](https://github.com/xmake-io/xmake/pull/3815): Improve tools.xmake to pass toolchains for windows
+* [#3857](https://github.com/xmake-io/xmake/issues/3857): Improve to generate compile_commands.json
+* [#3892](https://github.com/xmake-io/xmake/issues/3892): Improve to search packages from description
+* [#3916](https://github.com/xmake-io/xmake/issues/3916): Improve to build swift program, support for multiple modules
+* Update lua runtime to 5.4.6
 
 ### Bugs fixed
 
 * [#3755](https://github.com/xmake-io/xmake/pull/3755): Fix find_tool from xmake/packages
 * [#3787](https://github.com/xmake-io/xmake/issues/3787): Fix packages from conan 2.x
+* [#3839](https://github.com/orgs/xmake-io/discussions/3839): Fix vs_runtime for conan 2.x
 
 ## v2.7.9
 
@@ -1427,7 +1459,7 @@
 ### Bugs fixed
 
 * [#41](https://github.com/waruqi/xmake/issues/41): Fix checker bug for windows
-* [#43](https://github.com/waruqi/xmake/issues/43): Avoid to generate unnecessary .xmake directory
+* [#43](https://github.com/waruqi/xmake/issues/43): Avoid generating unnecessary .xmake directory
 * Add c++ stl search directories for android
 * Fix compile error for rhel 5.10
 * Fix `os.iorun` bug
@@ -1598,8 +1630,35 @@
 
 ### 新特性
 
+* [#4002](https://github.com/xmake-io/xmake/issues/4002): 增加 soname 支持
+* [#1613](https://github.com/xmake-io/xmake/issues/1613): 为 add_vectorexts 增加 avx512 和 sse4.2 支持
+* [#2471](https://github.com/xmake-io/xmake/issues/2471): 添加 set_encodings API 去设置源文件和目标文件的编码
+* [#4071](https://github.com/xmake-io/xmake/pull/4071): 支持 sdcc 的 stm8 汇编器
+
+### 改进
+
+* [#3960](https://github.com/xmake-io/xmake/issues/3960): 改进 msys2/crt64 支持
+* [#4032](https://github.com/xmake-io/xmake/pull/4032): 移除一些非常老的废弃接口
+* 改进 tools.msbuild 升级 vcproj 文件
+* 支持 add_requires("xmake::xxx") 包
+* [#4049](https://github.com/xmake-io/xmake/issues/4049): 改进 Rust 支持交叉编译
+* 改进 clang 下 c++ modules 支持
+
+### Bugs 修复
+
+* 修复 macOS/Linux 上子子进程无法快速退出问题
+
+## v2.8.1
+
+### 新特性
+
 * [#3821](https://github.com/xmake-io/xmake/pull/3821): windows 安装器添加长路径支持选项
 * [#3828](https://github.com/xmake-io/xmake/pull/3828): 添加 zypper 包管理器支持
+* [#3871](https://github.com/xmake-io/xmake/issues/3871): 改进 tools.msbuild 支持对 vsproj 进行自动升级
+* [#3148](https://github.com/xmake-io/xmake/issues/3148): 改进 protobuf 支持 grpc
+* [#3889](https://github.com/xmake-io/xmake/issues/3889): add_links 支持库路径添加
+* [#3912](https://github.com/orgs/xmake-io/issues/3912): 添加 set_pmxxheader 去支持 objc 预编译头
+* add_links 支持库文件路径
 
 ### 改进
 
@@ -1607,11 +1666,16 @@
 * [#3371](https://github.com/xmake-io/xmake/issues/3371): 改进 tools.cmake 支持使用 ninja 去构建 wasm 包
 * [#3777](https://github.com/xmake-io/xmake/issues/3777): 改进从 pkg-config 中查找包
 * [#3815](https://github.com/xmake-io/xmake/pull/3815): 改进 tools.xmake 支持为 windows 平台传递工具链
+* [#3857](https://github.com/xmake-io/xmake/issues/3857): 改进生成 compile_commands.json
+* [#3892](https://github.com/xmake-io/xmake/issues/3892): 改进包搜索，支持从描述中找包
+* [#3916](https://github.com/xmake-io/xmake/issues/3916): 改进构建 swift 程序，支持模块间符号调用
+* 更新 lua 运行时到 5.4.6
 
 ### Bugs 修复
 
 * [#3755](https://github.com/xmake-io/xmake/pull/3755): 修复 find_tool 从 xmake/packages 中查找程序
 * [#3787](https://github.com/xmake-io/xmake/issues/3787): 修复从 conan 2.x 中使用包
+* [#3839](https://github.com/orgs/xmake-io/discussions/3839): 修复 conan 2.x 包的 vs_runtime 设置
 
 ## v2.7.9
 

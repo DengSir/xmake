@@ -186,6 +186,19 @@ function _get_cmd_mv(sourcefile, targetfile)
     end
 end
 
+-- get command: ln
+function _get_cmd_ln(sourcefile, targetfile)
+    if is_subhost("windows") then
+        if os.isdir(sourcefile) then
+            return string.format("@mklink /D %s %s > NUL 2>&1", sourcefile, targetfile)
+        else
+            return string.format("@mklink %s %s > NUL 2>&1", sourcefile, targetfile)
+        end
+    else
+        return string.format("@ln -s %s %s", sourcefile, targetfile)
+    end
+end
+
 -- get command: cpdir
 function _get_cmd_cpdir(sourcedir, targetdir)
     if is_subhost("windows") then
@@ -240,6 +253,8 @@ function _get_command_string(cmd, outputdir)
         return _get_cmd_rm(_get_relative_unix_path(cmd.filepath, outputdir))
     elseif kind == "mv" then
         return _get_cmd_mv(_get_relative_unix_path(cmd.srcpath, outputdir), _get_relative_unix_path(cmd.dstpath, outputdir))
+    elseif kind == "ln" then
+        return _get_cmd_ln(_get_relative_unix_path(cmd.srcpath, outputdir), _get_relative_unix_path(cmd.dstpath, outputdir))
     elseif kind == "cd" then
         return _get_cmd_cd(_get_relative_unix_path(cmd.dir, outputdir))
     elseif kind == "mkdir" then
@@ -640,9 +655,6 @@ function _add_clean_target(makefile, target, outputdir)
         _add_remove_files(makefile, target:targetfile(), outputdir)
         _add_remove_files(makefile, target:symbolfile(), outputdir)
         _add_remove_files(makefile, target:objectfiles(), outputdir)
-        -- TODO remove the header files (deprecated)
-        local _, dstheaders = target:headers()
-        _add_remove_files(makefile, dstheaders, outputdir)
     end
     makefile:print("")
 end

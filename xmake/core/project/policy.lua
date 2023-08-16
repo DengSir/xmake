@@ -60,13 +60,17 @@ function policy.policies()
             ["build.c++.msvc.fallbackscanner"]    = {description = "Force msvc fallback module dependency scanner.", default = false, type = "boolean"},
             -- force C++ modules fallback dependency scanner for gcc
             ["build.c++.gcc.fallbackscanner"]     = {description = "Force gcc fallback module dependency scanner.", default = false, type = "boolean"},
+            -- force to enable new cxx11 abi in C++ modules for gcc
+            -- If in the future, gcc can support it well, we'll turn it on by default
+            -- https://github.com/xmake-io/xmake/issues/3855
+            ["build.c++.gcc.modules.cxx11abi"]    = {description = "Force to enable new cxx11 abi in C++ modules for gcc.", type = "boolean"},
             -- enable cuda device link
             ["build.cuda.devlink"]                = {description = "Enable Cuda devlink.", type = "boolean"},
             -- preprocessor configuration for ccache/distcc, we can disable linemarkers to speed up preprocess
             ["preprocessor.linemarkers"]          = {description = "Enable linemarkers for preprocessor.", default = true, type = "boolean"},
             -- preprocessor configuration for ccache/distcc, we can disable it to avoid cache object file with __DATE__, __TIME__
             ["preprocessor.gcc.directives_only"]  = {description = "Enable -fdirectives-only for gcc preprocessor.", type = "boolean"},
-            -- we need enable longpaths when building target or installing package
+            -- we need to enable longpaths when building target or installing package
             ["platform.longpaths"]                = {description = "Enable long paths when building target or installing package on windows.", default = false, type = "boolean"},
             -- lock required packages
             ["package.requires_lock"]             = {description = "Enable xmake-requires.lock to lock required packages.", default = false, type = "boolean"},

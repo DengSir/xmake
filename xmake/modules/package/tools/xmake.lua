@@ -70,12 +70,17 @@ end
 
 -- get configs for windows
 function _get_configs_for_windows(package, configs, opt)
-    local names = {"vs", "vs_toolset", "vs_runtime"}
+    local names = {"vs", "vs_toolset"}
     for _, name in ipairs(names) do
         local value = get_config(name)
         if value ~= nil then
             table.insert(configs, "--" .. name .. "=" .. tostring(value))
         end
+    end
+    -- pass vs_runtime from package configs
+    local vs_runtime = package:config("vs_runtime")
+    if vs_runtime then
+        table.insert(configs, "--vs_runtime=" .. vs_runtime)
     end
     _get_configs_for_qt(package, configs, opt)
     _get_configs_for_vcpkg(package, configs, opt)
@@ -193,6 +198,7 @@ function _get_configs(package, configs, opt)
     local cxxflags = table.join(table.wrap(package:config("cxxflags")), get_config("cxxflags"))
     local asflags  = table.join(table.wrap(package:config("asflags")),  get_config("asflags"))
     local ldflags  = table.join(table.wrap(package:config("ldflags")),  get_config("ldflags"))
+    local shflags  = table.join(table.wrap(package:config("shflags")),  get_config("shflags"))
     table.insert(configs, "--plat=" .. package:plat())
     table.insert(configs, "--arch=" .. package:arch())
     if configs.mode == nil then
@@ -260,6 +266,9 @@ function _get_configs(package, configs, opt)
     end
     if ldflags and #ldflags > 0 then
         table.insert(configs, "--ldflags=" .. table.concat(ldflags, ' '))
+    end
+    if shflags and #shflags > 0 then
+        table.insert(configs, "--shflags=" .. table.concat(shflags, ' '))
     end
     local buildir = opt.buildir or package:buildir()
     if buildir then
@@ -427,7 +436,7 @@ function install(package, configs, opt)
     os.vrunv("xmake", argv, {envs = envs})
 
     -- do install
-    argv = {"install", "-y", "-o", package:installdir()}
+    argv = {"install", "-y", "--nopkgs", "-o", package:installdir()}
     _set_builtin_argv(package, argv)
     if opt.target then
         table.insert(argv, opt.target)

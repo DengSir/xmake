@@ -74,14 +74,25 @@ end
 -- translate compiler flags
 function _translate_compflags(compflags, outputdir)
     local flags = {}
+    local last_flag = nil;
     for _, flag in ipairs(compflags) do
-        for _, pattern in ipairs({"[%-](I)(.*)", "[%-](isystem)(.*)"}) do
-            flag = flag:gsub(pattern, function (flag, dir)
-                dir = _get_relative_unix_path(dir, outputdir)
-                return "-" .. flag .. dir
-            end)
+        if flag == "-I" or flag == "-isystem" then
+            last_flag = flag
+        else
+            if last_flag == "-I" or last_flag == "-isystem" then
+                table.insert(flags, last_flag)
+                flag = _get_relative_unix_path(flag, outputdir)
+            else
+                last_flag = flag
+                for _, pattern in ipairs({"[%-](I)(.*)", "[%-](isystem)(.*)"}) do
+                    flag = flag:gsub(pattern, function (flag, dir)
+                            dir = _get_relative_unix_path(dir, outputdir)
+                            return "-" .. flag .. dir
+                    end)
+                end
+            end
+            table.insert(flags, flag)
         end
-        table.insert(flags, flag)
     end
     return flags
 end
@@ -424,7 +435,7 @@ function make(outputdir)
 
     -- open the build.ninja file
     --
-    -- we need change encoding to support msvc_deps_prefix
+    -- we need to change encoding to support msvc_deps_prefix
     -- @see https://github.com/ninja-build/ninja/issues/613
     --
     -- TODO maybe we need support more encoding for other languages

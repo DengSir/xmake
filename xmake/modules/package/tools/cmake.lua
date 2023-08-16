@@ -86,7 +86,7 @@ end
 -- get msvc
 function _get_msvc(package)
     local msvc = toolchain.load("msvc", {plat = package:plat(), arch = package:arch()})
-    assert(msvc:check(), "vs not found!") -- we need check vs envs if it has been not checked yet
+    assert(msvc:check(), "vs not found!") -- we need to check vs envs if it has been not checked yet
     return msvc
 end
 
@@ -225,6 +225,7 @@ function _get_ldflags(package, opt)
         table.join2(result, _map_linkflags(package, "binary", {"cxx"}, "syslink", package:build_getenv("syslinks")))
         table.join2(result, _map_linkflags(package, "binary", {"cxx"}, "linkdir", package:build_getenv("linkdirs")))
     end
+    table.join2(result, package:config("ldflags"))
     if package:config("lto") then
         table.join2(result, package:_generate_lto_configs().ldflags)
     end
@@ -247,6 +248,7 @@ function _get_shflags(package, opt)
         table.join2(result, _map_linkflags(package, "shared", {"cxx"}, "syslink", package:build_getenv("syslinks")))
         table.join2(result, _map_linkflags(package, "shared", {"cxx"}, "linkdir", package:build_getenv("linkdirs")))
     end
+    table.join2(result, package:config("shflags"))
     if package:config("lto") then
         table.join2(result, package:_generate_lto_configs().shflags)
     end
@@ -270,6 +272,19 @@ function _get_vs_toolset(package)
         end
     end
     return toolset_ver
+end
+
+-- insert configs from envs
+function _insert_configs_from_envs(configs, envs, opt)
+    opt = opt or {}
+    local configs_str = opt._configs_str
+    for k, v in pairs(envs) do
+        if configs_str and configs_str:find(k, 1, true) then
+            -- use user custom configuration
+        else
+            table.insert(configs, "-D" .. k .. "=" .. v)
+        end
+    end
 end
 
 -- get configs for generic
@@ -407,9 +422,7 @@ function _get_configs_for_appleos(package, configs, opt)
     envs.CMAKE_FIND_ROOT_PATH_MODE_PROGRAM   = "NEVER"
     -- avoid install bundle targets
     envs.CMAKE_MACOSX_BUNDLE       = "NO"
-    for k, v in pairs(envs) do
-        table.insert(configs, "-D" .. k .. "=" .. v)
-    end
+    _insert_configs_from_envs(configs, envs, opt)
 end
 
 -- get configs for mingw
@@ -422,7 +435,6 @@ function _get_configs_for_mingw(package, configs, opt)
     envs.CMAKE_CXX_COMPILER        = _translate_bin_path(package:build_getenv("cxx"))
     envs.CMAKE_ASM_COMPILER        = _translate_bin_path(package:build_getenv("as"))
     envs.CMAKE_AR                  = _translate_bin_path(package:build_getenv("ar"))
-    envs.CMAKE_CUSTOM_LINKER       = _translate_bin_path(package:build_getenv("ld"))
     envs.CMAKE_RANLIB              = _translate_bin_path(package:build_getenv("ranlib"))
     envs.CMAKE_RC_COMPILER         = _translate_bin_path(package:build_getenv("mrc"))
     envs.CMAKE_C_FLAGS             = _get_cflags(package, opt)
@@ -447,14 +459,10 @@ function _get_configs_for_mingw(package, configs, opt)
         local mingw = assert(package:build_getenv("mingw") or package:build_getenv("sdk"), "mingw not found!")
         envs.CMAKE_MAKE_PROGRAM = path.join(mingw, "bin", "mingw32-make.exe")
     end
-
     if opt.cmake_generator == "Ninja" then
         envs.CMAKE_MAKE_PROGRAM = "ninja"
     end
-
-    for k, v in pairs(envs) do
-        table.insert(configs, "-D" .. k .. "=" .. v)
-    end
+    _insert_configs_from_envs(configs, envs, opt)
 end
 
 -- get configs for wasm
@@ -487,20 +495,27 @@ function _get_configs_for_cross(package, configs, opt)
         local dir = path.directory(cxx)
         local name = path.filename(cxx)
         name = name:gsub("clang$", "clang++")
-        name = name:gsub("clang%-", "clang++-")
+        name = name:gsub("clang%-", "clang++-") -- clang-xx
+        name = name:gsub("clang%.", "clang++.") -- clang.exe
         name = name:gsub("gcc$", "g++")
         name = name:gsub("gcc%-", "g++-")
-        envs.CMAKE_CXX_COMPILER = _translate_bin_path(dir and path.join(dir, name) or name)
+        name = name:gsub("gcc%.", "g++.")
+        if dir and dir ~= "." then
+            cxx = path.join(dir, name)
+        else
+            cxx = name
+        end
+        envs.CMAKE_CXX_COMPILER = _translate_bin_path(cxx)
     end
     -- @note The link command line is set in Modules/CMake{C,CXX,Fortran}Information.cmake and defaults to using the compiler, not CMAKE_LINKER,
-    -- so we need set CMAKE_CXX_LINK_EXECUTABLE to use CMAKE_LINKER as linker.
+    -- so we need to set CMAKE_CXX_LINK_EXECUTABLE to use CMAKE_LINKER as linker.
     --
     -- https://github.com/xmake-io/xmake-repo/pull/1039
     -- https://stackoverflow.com/questions/1867745/cmake-use-a-custom-linker/25274328#25274328
     -- https://github.com/xmake-io/xmake-repo/pull/2134#issuecomment-1573195810
-    envs.CMAKE_CUSTOM_LINKER       = _translate_bin_path(package:build_getenv("ld"))
+    local ld = _translate_bin_path(package:build_getenv("ld"))
     if package:has_tool("ld", "gxx", "clangxx") then
-        envs.CMAKE_CXX_LINK_EXECUTABLE = "<CMAKE_CUSTOM_LINKER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>"
+        envs.CMAKE_CXX_LINK_EXECUTABLE = ld .. " <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>"
     end
     envs.CMAKE_RANLIB              = _translate_bin_path(package:build_getenv("ranlib"))
     envs.CMAKE_C_FLAGS             = _get_cflags(package, opt)
@@ -509,10 +524,14 @@ function _get_configs_for_cross(package, configs, opt)
     envs.CMAKE_STATIC_LINKER_FLAGS = table.concat(table.wrap(package:build_getenv("arflags")), ' ')
     envs.CMAKE_EXE_LINKER_FLAGS    = _get_ldflags(package, opt)
     envs.CMAKE_SHARED_LINKER_FLAGS = _get_shflags(package, opt)
-    -- we need not set it as cross compilation if we just pass toolchain
+    -- we don't need to set it as cross compilation if we just pass toolchain
     -- https://github.com/xmake-io/xmake/issues/2170
     if not package:is_plat(os.subhost()) then
-        envs.CMAKE_SYSTEM_NAME     = package:targetos() or "Linux"
+        local system_name = package:targetos() or "Linux"
+        if system_name == "linux" then
+            system_name = "Linux"
+        end
+        envs.CMAKE_SYSTEM_NAME = system_name
     else
         if package:config("pic") ~= false then
             table.insert(configs, "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
@@ -520,7 +539,7 @@ function _get_configs_for_cross(package, configs, opt)
     end
     -- avoid find and add system include/library path
     -- @see https://github.com/xmake-io/xmake/issues/2037
-    envs.CMAKE_FIND_ROOT_PATH      = sdkdir
+    envs.CMAKE_FIND_ROOT_PATH              = sdkdir
     envs.CMAKE_FIND_ROOT_PATH_MODE_LIBRARY = "BOTH"
     envs.CMAKE_FIND_ROOT_PATH_MODE_INCLUDE = "BOTH"
     envs.CMAKE_FIND_ROOT_PATH_MODE_PROGRAM = "NEVER"
@@ -531,9 +550,7 @@ function _get_configs_for_cross(package, configs, opt)
     -- Avoids finding host include/library path
     envs.CMAKE_FIND_USE_CMAKE_SYSTEM_PATH = "0"
     envs.CMAKE_FIND_USE_INSTALL_PREFIX = "0"
-    for k, v in pairs(envs) do
-        table.insert(configs, "-D" .. k .. "=" .. v)
-    end
+    _insert_configs_from_envs(configs, envs, opt)
 end
 
 -- get configs for host toolchain
@@ -553,9 +570,16 @@ function _get_configs_for_host_toolchain(package, configs, opt)
         local name = path.filename(cxx)
         name = name:gsub("clang$", "clang++")
         name = name:gsub("clang%-", "clang++-")
+        name = name:gsub("clang%.", "clang++.")
         name = name:gsub("gcc$", "g++")
         name = name:gsub("gcc%-", "g++-")
-        envs.CMAKE_CXX_COMPILER = _translate_bin_path(dir and path.join(dir, name) or name)
+        name = name:gsub("gcc%.", "g++.")
+        if dir and dir ~= "." then
+            cxx = path.join(dir, name)
+        else
+            cxx = name
+        end
+        envs.CMAKE_CXX_COMPILER = _translate_bin_path(cxx)
     end
     -- @note The link command line is set in Modules/CMake{C,CXX,Fortran}Information.cmake and defaults to using the compiler, not CMAKE_LINKER,
     -- so we need set CMAKE_CXX_LINK_EXECUTABLE to use CMAKE_LINKER as linker.
@@ -563,9 +587,9 @@ function _get_configs_for_host_toolchain(package, configs, opt)
     -- https://github.com/xmake-io/xmake-repo/pull/1039
     -- https://stackoverflow.com/questions/1867745/cmake-use-a-custom-linker/25274328#25274328
     -- https://github.com/xmake-io/xmake-repo/pull/2134#issuecomment-1573195810
-    envs.CMAKE_CUSTOM_LINKER       = _translate_bin_path(package:build_getenv("ld"))
+    local ld = _translate_bin_path(package:build_getenv("ld"))
     if package:has_tool("ld", "gxx", "clangxx") then
-        envs.CMAKE_CXX_LINK_EXECUTABLE = "<CMAKE_CUSTOM_LINKER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>"
+        envs.CMAKE_CXX_LINK_EXECUTABLE = ld .. " <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>"
     end
     envs.CMAKE_RANLIB              = _translate_bin_path(package:build_getenv("ranlib"))
     envs.CMAKE_C_FLAGS             = _get_cflags(package, opt)
@@ -574,7 +598,7 @@ function _get_configs_for_host_toolchain(package, configs, opt)
     envs.CMAKE_STATIC_LINKER_FLAGS = table.concat(table.wrap(package:build_getenv("arflags")), ' ')
     envs.CMAKE_EXE_LINKER_FLAGS    = _get_ldflags(package, opt)
     envs.CMAKE_SHARED_LINKER_FLAGS = _get_shflags(package, opt)
-    -- we need not set it as cross compilation if we just pass toolchain
+    -- we don't need to set it as cross compilation if we just pass toolchain
     -- https://github.com/xmake-io/xmake/issues/2170
     if not package:is_plat(os.subhost()) then
         envs.CMAKE_SYSTEM_NAME     = "Linux"
@@ -583,9 +607,7 @@ function _get_configs_for_host_toolchain(package, configs, opt)
             table.insert(configs, "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
         end
     end
-    for k, v in pairs(envs) do
-        table.insert(configs, "-D" .. k .. "=" .. v)
-    end
+    _insert_configs_from_envs(configs, envs, opt)
 end
 
 -- get cmake generator for msvc
@@ -699,7 +721,7 @@ end
 -- get build environments
 function buildenvs(package, opt)
 
-    -- we need bind msvc environments manually
+    -- we need to bind msvc environments manually
     -- @see https://github.com/xmake-io/xmake/issues/1057
     opt = opt or {}
     local envs = {}
@@ -707,7 +729,7 @@ function buildenvs(package, opt)
         envs = _get_msvc_runenvs(package)
     end
 
-    -- we need pass pkgconf for windows/mingw without msys2/cygwin
+    -- we need to pass pkgconf for windows/mingw without msys2/cygwin
     if package:is_plat("windows", "mingw") and is_subhost("windows") then
         local pkgconf = find_tool("pkgconf")
         if pkgconf then
